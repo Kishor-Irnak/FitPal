@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Gym Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Add Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100dvh;
+            background-color: #0c0c0c; /* Deeper dark background */
+        }
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* Glassmorphism Effect - REMOVED */
+
+        /* Solid Card Style */
+        .solid-card {
+            background-color: #1f2937; /* bg-gray-800 */
+            border: 1px solid #374151; /* border-gray-700 */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Custom scrollbar for better look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #a3e635; /* lime-400 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #84cc16; /* lime-500 */
+        }
+
+        /* Active tab styling */
+        .tab-button.active {
+            border-bottom: 2px solid #a3e635; /* lime-400 */
+            color: #a3e635; /* lime-400 */
+            font-weight: 600;
+        }
+
+        /* Fade-in for new sets */
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Message Box animation */
+        #message-box.show {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+        #message-box {
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+            transform: translateY(20px) scale(0.95);
+            opacity: 0;
+            pointer-events: none; /* Allows clicks to pass through when hidden */
+        }
+    </style>
+</head>
+<body class="bg-black text-gray-100 flex flex-col items-center">
+
+    <!-- Main container constrained to a phone-like width --><div class="max-w-md w-full min-h-screen bg-black shadow-2xl flex flex-col relative overflow-hidden">
+
+        <!-- Header --><header class="p-4 bg-gray-900 border-b border-gray-800 flex items-center justify-between z-10">
+            <h1 class="text-2xl font-bold text-lime-400">FitPal</h1>
+            <div class="flex items-center gap-4">
+                <div class="flex bg-gray-800 rounded-lg p-1">
+                    <button id="unit-toggle-kg" class="px-3 py-1 text-sm font-medium rounded-md" data-unit="kg">KG</button>
+                    <button id="unit-toggle-lbs" class="px-3 py-1 text-sm font-medium rounded-md" data-unit="lbs">LBS</button>
+                </div>
+                <button id="clear-all-btn" class="text-red-500 text-sm font-medium px-2 py-1 rounded-md bg-gray-800 hover:bg-gray-700">Clear All</button>
+            </div>
+        </header>
+
+        <!-- Tabs for Routines, Body Weight, History --><nav class="flex justify-around bg-gray-900 border-b border-gray-800 z-10">
+            <button id="tab-routines" class="tab-button flex-1 py-3 text-gray-400 hover:text-lime-300 active">Routines</button>
+            <button id="tab-bodyweight" class="tab-button flex-1 py-3 text-gray-400 hover:text-lime-300">Body Weight</button>
+            <button id="tab-history" class="tab-button flex-1 py-3 text-gray-400 hover:text-lime-300">Global History</button>
+        </nav>
+
+        <!-- ===== View 1: Workout Routines List (Default Home) ===== --><div id="routines-view" class="p-4 flex-grow overflow-y-auto custom-scroll">
+            <h2 class="text-xl font-semibold mb-4 text-lime-300">My Routines</h2>
+
+            <!-- Form to add a new routine --><form id="add-routine-form" class="flex gap-2 mb-6 solid-card p-4 rounded-lg">
+                <input type="text" id="new-routine-name"
+                    class="flex-grow bg-gray-700/50 border border-gray-600/50 text-white rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-lime-500"
+                    placeholder="e.g., Chest & Triceps" required>
+                <button type="submit"
+                    class="bg-lime-500 text-black font-semibold py-3 px-5 rounded-lg hover:bg-lime-400 focus:outline-none focus:ring-2 focus:ring-lime-500 active:bg-lime-600">
+                    Add
+                </button>
+            </form>
+
+            <!-- List of routines will be injected here by JS --><div id="routine-list" class="space-y-3">
+                <!-- Routine items here --></div>
+        </div>
+
+        <!-- ===== View 2: Body Weight Tracker ===== --><div id="bodyweight-view" class="p-4 flex-grow overflow-y-auto custom-scroll hidden">
+            <h2 class="text-xl font-semibold mb-4 text-lime-300">Track Body Weight</h2>
+
+            <form id="add-bodyweight-form" class="flex gap-2 mb-6 solid-card p-4 rounded-lg">
+                <input type="number" id="bodyweight-input" inputmode="decimal" step="0.01"
+                    class="flex-grow bg-gray-700/50 border border-gray-600/50 text-white rounded-lg py-3 px-4 text-lg focus:outline-none focus:ring-2 focus:ring-lime-500"
+                    placeholder="e.g., 75.5" required>
+                <span id="bodyweight-unit" class="self-center text-gray-400 text-lg">kg</span>
+                <button type="submit"
+                    class="bg-lime-500 text-black font-semibold py-3 px-5 rounded-lg hover:bg-lime-400 focus:outline-none focus:ring-2 focus:ring-lime-500 active:bg-lime-600">
+                    Log
+                </button>
+            </form>
+
+            <!-- Body Weight Chart -->
+            <div class="solid-card p-4 rounded-lg mb-6">
+                <h3 class="text-lg font-semibold mb-3 text-gray-300">Progress Chart</h3>
+                <div class="h-64">
+                    <canvas id="bodyweight-chart"></canvas>
+                </div>
+            </div>
+
+            <h3 class="text-lg font-semibold mb-3 text-gray-300">Your Body Weight History</h3>
+            <div id="bodyweight-history" class="space-y-2">
+                <!-- Body weight entries here --><p class="text-gray-500 text-center">No body weight logged yet.</p>
+            </div>
+        </div>
+
+        <!-- ===== View 3: Global History (All workouts, all exercises) ===== --><div id="global-history-view" class="p-4 flex-grow overflow-y-auto custom-scroll hidden">
+            <h2 class="text-xl font-semibold mb-4 text-lime-300">All Workout History</h2>
+            <div id="global-workout-history-list" class="space-y-4">
+                <!-- Global workout history here --><p class="text-gray-500 text-center">No workouts recorded yet.</p>
+            </div>
+        </div>
+
+        <!-- ===== View 4: Routine Detail & Exercise Logging ===== --><div id="routine-detail-view" class="hidden absolute inset-0 bg-black flex flex-col p-4 overflow-y-auto custom-scroll z-20">
+            <!-- Header with Back button and Title --><div class="flex items-center justify-between mb-4 solid-card p-3 rounded-lg -mx-1">
+                <button id="routine-detail-back-btn" class="text-lime-400 font-medium p-2 -ml-2">&larr; Back</button>
+                <h2 id="current-routine-name" class="text-2xl font-bold text-lime-300 text-center flex-grow mx-2">Routine Name</h2>
+                <button id="delete-routine-btn" class="text-red-500 font-medium p-2 -mr-2">Delete</button>
+            </div>
+
+            <h3 class="text-lg font-semibold mb-3 text-gray-300">Exercises in this Routine</h3>
+
+            <!-- Form to add a new exercise to this routine --><form id="add-exercise-to-routine-form" class="flex gap-2 mb-6 solid-card p-4 rounded-lg">
+                <input type="text" id="new-routine-exercise-name"
+                    class="flex-grow bg-gray-700/50 border border-gray-600/50 text-white rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-lime-500"
+                    placeholder="e.g., Barbell Bench Press" required>
+                <button type="submit"
+                    class="bg-lime-500 text-black font-semibold py-3 px-5 rounded-lg hover:bg-lime-400 focus:outline-none focus:ring-2 focus:ring-lime-500 active:bg-lime-600">
+                    Add
+                </button>
+            </form>
+
+            <div id="routine-exercise-list" class="space-y-3 flex-grow">
+                <!-- Exercises for the current routine --></div>
+        </div>
+
+        <!-- ===== View 5: Exercise Detail & Logging within a Routine ===== --><div id="exercise-logging-view" class="hidden absolute inset-0 bg-black flex flex-col p-4 overflow-y-auto custom-scroll z-30">
+            <!-- Header with Back button and Title --><div class="flex items-center justify-between mb-4 solid-card p-3 rounded-lg -mx-1">
+                <button id="exercise-logging-back-btn" class="text-lime-400 font-medium p-2 -ml-2">&larr; Routine</button>
+                <h2 id="logging-exercise-name" class="text-2xl font-bold text-lime-300 text-center flex-grow mx-2">Exercise Name</h2>
+                <button id="delete-exercise-from-routine-btn" class="text-red-500 font-medium p-2 -mr-2">Delete</button>
+            </div>
+
+            <!-- Progressive Overload Info Box --><div class="solid-card p-4 rounded-lg text-center mb-6">
+                <h3 class="text-sm font-medium text-gray-400 uppercase tracking-wide">Last Workout for this exercise:</h3>
+                <p id="last-workout-info" class="text-lg font-semibold text-lime-300 mt-1">
+                    No previous history. Go for it!
+                </p>
+                <button id="show-exercise-history-btn" class="mt-2 text-lime-400 text-sm font-medium hover:underline">View All History</button>
+            </div>
+
+            <!-- Form to log a new set --><form id="add-set-form" class="mb-6 solid-card p-4 rounded-lg">
+                <div class="flex gap-3 mb-3">
+                    <div class="flex-1">
+                        <label for="reps-input" class="block text-sm font-medium text-gray-400 mb-1">Reps</label>
+                        <input type="number" id="reps-input" inputmode="numeric"
+                            class="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg py-3 px-4 text-lg text-center focus:outline-none focus:ring-2 focus:ring-lime-500"
+                            placeholder="8">
+                    </div>
+                    <div class="flex-1">
+                        <label for="weight-input" class="block text-sm font-medium text-gray-400 mb-1">Weight (<span id="current-weight-unit">kg</span>)</label>
+                        <input type="number" id="weight-input" inputmode="decimal" step="0.5"
+                            class="w-full bg-gray-700/50 border border-gray-600/50 rounded-lg py-3 px-4 text-lg text-center focus:outline-none focus:ring-2 focus:ring-lime-500"
+                            placeholder="100">
+                    </div>
+                </div>
+                <button type="submit"
+                    class="w-full bg-lime-500 text-black font-semibold py-3 px-4 rounded-lg hover:bg-lime-400 focus:outline-none focus:ring-2 focus:ring-lime-500 active:bg-lime-600">
+                    Add Set
+                </button>
+            </form>
+
+            <h3 class="text-lg font-semibold mb-3 text-gray-300">Today's Sets</h3>
+            <ul id="current-sets-list" class="space-y-2 flex-grow min-h-[50px]">
+                <p class="text-gray-500 text-center text-sm">Add your first set above.</p>
+            </ul>
+
+            <!-- Save Workout Button --><div class="mt-auto pt-6">
+                <button id="save-workout-btn"
+                    class="w-full bg-green-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 active:bg-green-800">
+                    Save Workout
+                </button>
+            </div>
+        </div>
+
+        <!-- ===== View 6: Exercise History for a specific exercise ===== --><div id="exercise-history-view" class="hidden absolute inset-0 bg-black flex flex-col p-4 overflow-y-auto custom-scroll z-40">
+            <div class="flex items-center justify-between mb-4 solid-card p-3 rounded-lg -mx-1">
+                <button id="exercise-history-back-btn" class="text-lime-400 font-medium p-2 -ml-2">&larr; Logging</button>
+                <h2 id="history-exercise-name" class="text-2xl font-bold text-lime-300 text-center flex-grow mx-2">Exercise History</h2>
+                <span class="w-[60px]"></span> <!-- Placeholder for alignment --></div>
+
+            <div id="full-exercise-history-list" class="space-y-4 flex-grow">
+                <!-- Full history for the selected exercise --><p class="text-gray-500 text-center">No history for this exercise yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Confirmation Modal ===== --><div id="confirmation-modal"
+        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 hidden opacity-0">
+        <div class="solid-card rounded-lg p-6 shadow-xl max-w-sm w-full">
+            <h3 id="modal-title" class="text-xl font-bold mb-4">Are you sure?</h3>
+            <p id="modal-message" class="text-gray-300 mb-6">This action cannot be undone.</p>
+            <div class="flex justify-end gap-3">
+                <button id="modal-cancel-btn"
+                    class="bg-gray-600 text-white font-semibold py-2 px-5 rounded-lg hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                    Cancel
+                </button>
+                <button id="modal-confirm-btn"
+                    class="bg-red-600 text-white font-semibold py-2 px-5 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Message Box (Toast Notification) ===== --><div id="message-box"
+        class="fixed bottom-4 right-4 bg-green-500 text-white py-3 px-5 rounded-lg shadow-lg z-50">
+        <span id="message-text">Workout Saved!</span>
+    </div>
+
+    <script>
+        // Set Tailwind config for dynamic colors
+        tailwind.config = {
+            darkMode: 'class', // or 'media'
+            theme: {
+                extend: {
+                    colors: {
+                        'lime-300': '#bef264',
+                        'lime-400': '#a3e635',
+                        'lime-500': '#84cc16',
+                        'lime-600': '#65a30d',
+                        'green-500': '#22c55e',
+                        'green-600': '#16a34a',
+                        'green-700': '#15803d',
+                        'red-500': '#ef4444',
+                        'red-600': '#dc2626',
+                        'red-700': '#b91c1c',
+                        'gray-100': '#f3f4f6',
+                        'gray-300': '#d1d5db',
+                        'gray-400': '#9ca3af',
+                        'gray-500': '#6b7280',
+                        'gray-600': '#4b5563',
+                        'gray-700': '#374151',
+                        'gray-800': '#1f2937',
+                        'gray-900': '#111827',
+                        'gray-950': '#0c0c0c',
+                        'black': '#000000',
+                    }
+                }
+            }
+        };
+        
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- STATE & CONSTANTS ---
+            let db = {}; // Our 'database'
+            let currentView = 'routines'; // 'routines', 'bodyweight', 'globalHistory', 'routineDetail', 'exerciseLogging', 'exerciseHistory'
+            let currentRoutine = null;
+            let currentExerciseInRoutine = null;
+            let currentSets = []; // Sets for the exercise being logged in the current session
+            let modalConfirmCallback = null; // Function to run when modal is confirmed
+            let unitPreference = localStorage.getItem('unitPreference') || 'kg'; // 'kg' or 'lbs'
+            let bodyWeightChart = null; // To hold the Chart.js instance
+
+            const KG_TO_LBS = 2.20462;
+            const LBS_TO_KG = 0.453592;
+
+            // --- DOM ELEMENTS ---
+            // Views
+            const views = {
+                routines: document.getElementById('routines-view'),
+                bodyweight: document.getElementById('bodyweight-view'),
+                globalHistory: document.getElementById('global-history-view'),
+                routineDetail: document.getElementById('routine-detail-view'),
+                exerciseLogging: document.getElementById('exercise-logging-view'),
+                exerciseHistory: document.getElementById('exercise-history-view'),
+            };
+
+            // Header & Tabs
+            const tabButtons = {
+                routines: document.getElementById('tab-routines'),
+                bodyweight: document.getElementById('tab-bodyweight'),
+                history: document.getElementById('tab-history'),
+            };
+            const unitToggleKg = document.getElementById('unit-toggle-kg');
+            const unitToggleLbs = document.getElementById('unit-toggle-lbs');
+            const clearAllBtn = document.getElementById('clear-all-btn');
+
+            // Routines View
+            const addRoutineForm = document.getElementById('add-routine-form');
+            const newRoutineInput = document.getElementById('new-routine-name');
+            const routineList = document.getElementById('routine-list');
+
+            // Body Weight View
+            const addBodyweightForm = document.getElementById('add-bodyweight-form');
+            const bodyweightInput = document.getElementById('bodyweight-input');
+            const bodyweightUnitSpan = document.getElementById('bodyweight-unit');
+            const bodyweightHistoryList = document.getElementById('bodyweight-history');
+            const bodyweightChartCanvas = document.getElementById('bodyweight-chart');
+
+            // Global History View
+            const globalWorkoutHistoryList = document.getElementById('global-workout-history-list');
+
+            // Routine Detail View
+            const routineDetailBackBtn = document.getElementById('routine-detail-back-btn');
+            const deleteRoutineBtn = document.getElementById('delete-routine-btn');
+            const currentRoutineName = document.getElementById('current-routine-name');
+            const addExerciseToRoutineForm = document.getElementById('add-exercise-to-routine-form');
+            const newRoutineExerciseName = document.getElementById('new-routine-exercise-name');
+            const routineExerciseList = document.getElementById('routine-exercise-list');
+
+            // Exercise Logging View
+            const exerciseLoggingBackBtn = document.getElementById('exercise-logging-back-btn');
+            const deleteExerciseFromRoutineBtn = document.getElementById('delete-exercise-from-routine-btn');
+            const loggingExerciseName = document.getElementById('logging-exercise-name');
+            const lastWorkoutInfo = document.getElementById('last-workout-info');
+            const showExerciseHistoryBtn = document.getElementById('show-exercise-history-btn');
+            const addSetForm = document.getElementById('add-set-form');
+            const repsInput = document.getElementById('reps-input');
+            const weightInput = document.getElementById('weight-input');
+            const currentWeightUnitSpan = document.getElementById('current-weight-unit');
+            const currentSetsList = document.getElementById('current-sets-list');
+            const saveWorkoutBtn = document.getElementById('save-workout-btn');
+
+            // Exercise History View
+            const exerciseHistoryBackBtn = document.getElementById('exercise-history-back-btn');
+            const historyExerciseName = document.getElementById('history-exercise-name');
+            const fullExerciseHistoryList = document.getElementById('full-exercise-history-list');
+
+            // Modal & Message
+            const modal = document.getElementById('confirmation-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalCancelBtn = document.getElementById('modal-cancel-btn');
+            const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+            const messageBox = document.getElementById('message-box');
+            const messageText = document.getElementById('message-text');
+
+            // --- DATA FUNCTIONS ---
+            function loadData() {
+                const data = localStorage.getItem('fitPalData');
+                db = data ? JSON.parse(data) : {
+                    routines: {},
+                    bodyWeight: []
+                };
+            }
+
+            function saveData() {
+                localStorage.setItem('fitPalData', JSON.stringify(db));
+            }
+
+            // --- UNIT CONVERSION ---
+            function convertWeight(value, fromUnit, toUnit) {
+                if (fromUnit === toUnit) return value;
+                if (fromUnit === 'lbs' && toUnit === 'kg') return value * LBS_TO_KG;
+                if (fromUnit === 'kg' && toUnit === 'lbs') return value * KG_TO_LBS;
+                return value; // Should not happen
+            }
+
+            function formatWeight(kgValue, displayUnit = unitPreference) {
+                let displayValue = kgValue;
+                if (displayUnit === 'lbs') {
+                    displayValue = convertWeight(kgValue, 'kg', 'lbs');
+                }
+                return `${displayValue.toFixed(1)} ${displayUnit}`;
+            }
+
+            function updateUnitPreference(unit) {
+                unitPreference = unit;
+                localStorage.setItem('unitPreference', unit);
+                unitToggleKg.classList.toggle('bg-lime-500', unit === 'kg');
+                unitToggleKg.classList.toggle('text-black', unit === 'kg');
+                unitToggleLbs.classList.toggle('bg-lime-500', unit === 'lbs');
+                unitToggleLbs.classList.toggle('text-black', unit === 'lbs');
+
+                // Update unit display in relevant places
+                bodyweightUnitSpan.textContent = unit;
+                currentWeightUnitSpan.textContent = unit;
+                
+                // Re-render current sets to reflect new unit
+                if (currentView === 'exerciseLogging') {
+                    renderCurrentSets();
+                    lastWorkoutInfo.textContent = formatLastWorkout(currentRoutine, currentExerciseInRoutine);
+                }
+                // Re-render bodyweight history
+                if (currentView === 'bodyweight') {
+                    renderBodyWeightHistory();
+                }
+                 // Re-render global history
+                 if (currentView === 'globalHistory') {
+                    renderGlobalHistory();
+                }
+                // Re-render exercise history
+                if (currentView === 'exerciseHistory') {
+                    renderExerciseHistory(currentRoutine, currentExerciseInRoutine);
+                }
+            }
+
+            // --- UTILITY FUNCTIONS ---
+            function toTitleCase(str) {
+                return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+            }
+
+            function getTodayDate() {
+                return new Date().toISOString().split('T')[0];
+            }
+
+            function formatDateDisplay(isoDate) {
+                const date = new Date(isoDate);
+                return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+
+            function formatLastWorkout(routineName, exerciseName) {
+                if (!db.routines[routineName] || !db.routines[routineName][exerciseName]) {
+                    return "No previous history. Go for it!";
+                }
+                const history = db.routines[routineName][exerciseName];
+                if (history.length === 0) {
+                    return "No previous history. Go for it!";
+                }
+
+                const lastWorkout = history[history.length - 1];
+                const sets = lastWorkout.sets;
+                if (sets.length === 0) {
+                    return `No sets logged on ${formatDateDisplay(lastWorkout.date)}`;
+                }
+                
+                const numSets = sets.length;
+                const firstSet = sets[0];
+                const lastSet = sets[sets.length - 1];
+                
+                const allSame = sets.every(set => set.reps === firstSet.reps && set.weight === firstSet.weight);
+                const firstWeightFormatted = formatWeight(firstSet.weight);
+                const lastWeightFormatted = formatWeight(lastSet.weight);
+
+                if (allSame) {
+                    return `${numSets} sets of ${firstSet.reps} reps @ ${firstWeightFormatted} (on ${formatDateDisplay(lastWorkout.date)})`;
+                } else {
+                    return `${numSets} sets on ${formatDateDisplay(lastWorkout.date)}. (Last: ${lastSet.reps} reps @ ${lastWeightFormatted})`;
+                }
+            }
+
+            // --- MODAL & MESSAGE FUNCTIONS ---
+            function showModal(title, message, onConfirm) {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                modalConfirmCallback = onConfirm;
+                modal.classList.remove('hidden');
+                setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            }
+
+            function hideModal() {
+                modal.classList.add('opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 200);
+                modalConfirmCallback = null;
+            }
+
+            function showMessage(message, isError = false) {
+                messageText.textContent = message;
+                messageBox.classList.toggle('bg-red-500', isError);
+                messageBox.classList.toggle('bg-lime-500', !isError);
+                messageBox.classList.toggle('text-black', !isError);
+                messageBox.classList.toggle('text-white', isError);
+
+                messageBox.classList.remove('hidden');
+                setTimeout(() => {
+                    messageBox.classList.add('show');
+                }, 10);
+                
+                setTimeout(() => {
+                    messageBox.classList.remove('show');
+                    setTimeout(() => messageBox.classList.add('hidden'), 300);
+                }, 2000);
+            }
+
+            // --- VIEW MANAGEMENT ---
+            function showView(viewName) {
+                Object.values(views).forEach(view => view.classList.add('hidden'));
+                views[viewName].classList.remove('hidden');
+                currentView = viewName;
+
+                // Handle tab active state
+                Object.values(tabButtons).forEach(btn => btn.classList.remove('active'));
+                if (tabButtons[viewName]) {
+                    tabButtons[viewName].classList.add('active');
+                } else if (viewName === 'routineDetail' || viewName === 'exerciseLogging' || viewName === 'exerciseHistory') {
+                    // These are sub-views of routines, keep routines tab active
+                    tabButtons.routines.classList.add('active');
+                }
+
+                // Call specific render functions for main views
+                if (viewName === 'routines') renderRoutineList();
+                if (viewName === 'bodyweight') renderBodyWeightHistory();
+                if (viewName === 'globalHistory') renderGlobalHistory();
+            }
+
+            // --- RENDER FUNCTIONS ---
+
+            // Render Routines (Home Page)
+            function renderRoutineList() {
+                routineList.innerHTML = '';
+                const routines = Object.keys(db.routines).sort();
+
+                if (routines.length === 0) {
+                    routineList.innerHTML = `
+                        <p class="text-gray-500 text-center mt-8">No routines added yet.</p>
+                        <p class="text-gray-500 text-center">Add one above to get started!</p>
+                    `;
+                    return;
+                }
+
+                routines.forEach(routine => {
+                    const el = document.createElement('div');
+                    el.className = "solid-card p-5 rounded-lg shadow-md cursor-pointer hover:bg-gray-700 active:bg-gray-700 flex justify-between items-center";
+                    el.setAttribute('data-routine', routine);
+                    
+                    const text = document.createElement('span');
+                    text.className = "text-lg font-medium text-gray-100";
+                    text.textContent = routine;
+
+                    const arrow = document.createElement('span');
+                    arrow.className = 'text-xl text-lime-400 font-bold';
+                    arrow.innerHTML = '&rarr;';
+                    
+                    el.appendChild(text);
+                    el.appendChild(arrow);
+
+                    el.addEventListener('click', () => {
+                        currentRoutine = routine;
+                        currentRoutineName.textContent = routine;
+                        showView('routineDetail');
+                        renderRoutineExercises(routine);
+                    });
+                    routineList.appendChild(el);
+                });
+            }
+
+            // Render Exercises within a specific Routine
+            function renderRoutineExercises(routineName) {
+                routineExerciseList.innerHTML = '';
+                const exercises = db.routines[routineName] ? Object.keys(db.routines[routineName]).sort() : [];
+
+                if (exercises.length === 0) {
+                    routineExerciseList.innerHTML = `
+                        <p class="text-gray-500 text-center mt-8">No exercises in this routine yet.</p>
+                        <p class="text-gray-500 text-center">Add one above!</p>
+                    `;
+                    return;
+                }
+
+                exercises.forEach(exercise => {
+                    const el = document.createElement('div');
+                    el.className = "solid-card p-4 rounded-lg shadow-md cursor-pointer hover:bg-gray-700 active:bg-gray-700 flex justify-between items-center";
+                    el.setAttribute('data-exercise', exercise);
+                    
+                    const text = document.createElement('span');
+                    text.className = "text-lg font-medium text-gray-100";
+                    text.textContent = exercise;
+
+                    const arrow = document.createElement('span');
+                    arrow.className = 'text-xl text-lime-400 font-bold';
+                    arrow.innerHTML = '&rarr;';
+
+                    el.appendChild(text);
+                    el.appendChild(arrow);
+                    
+                    el.addEventListener('click', () => {
+                        currentExerciseInRoutine = exercise;
+                        loggingExerciseName.textContent = exercise;
+                        currentSets = []; // Reset current sets for new logging session
+                        renderCurrentSets(); // Clear current sets display
+                        lastWorkoutInfo.textContent = formatLastWorkout(currentRoutine, currentExerciseInRoutine);
+                        showView('exerciseLogging');
+                    });
+                    routineExerciseList.appendChild(el);
+                });
+            }
+
+            // Render sets being logged for the current exercise session
+            function renderCurrentSets() {
+                currentSetsList.innerHTML = '';
+                if (currentSets.length === 0) {
+                    currentSetsList.innerHTML = `<p class="text-gray-500 text-center text-sm">Add your first set above.</p>`;
+                    return;
+                }
+
+                [...currentSets].reverse().forEach((set, index) => {
+                    const reversedIndex = currentSets.length - 1 - index;
+                    const el = document.createElement('li');
+                    el.className = "solid-card p-3 rounded-lg flex justify-between items-center animate-fade-in";
+                    
+                    const text = document.createElement('span');
+                    text.className = "font-medium text-gray-100";
+                    text.textContent = `Set ${reversedIndex + 1}: ${set.reps} reps @ ${formatWeight(set.weight)}`;
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = "text-sm text-red-500 hover:text-red-400 font-medium px-2";
+                    removeBtn.textContent = "Remove";
+                    removeBtn.setAttribute('data-index', reversedIndex);
+
+                    removeBtn.addEventListener('click', () => {
+                        currentSets.splice(reversedIndex, 1);
+                        renderCurrentSets();
+                    });
+
+                    el.appendChild(text);
+                    el.appendChild(removeBtn);
+                    currentSetsList.appendChild(el);
+                });
+            }
+
+            // Render full history for a specific exercise
+            function renderExerciseHistory(routineName, exerciseName) {
+                fullExerciseHistoryList.innerHTML = '';
+                const history = db.routines[routineName] && db.routines[routineName][exerciseName] ? db.routines[routineName][exerciseName] : [];
+
+                if (history.length === 0) {
+                    fullExerciseHistoryList.innerHTML = `<p class="text-gray-500 text-center mt-8">No history for this exercise yet.</p>`;
+                    return;
+                }
+
+                history.slice().reverse().forEach(workout => { // Reverse to show newest first
+                    const workoutDiv = document.createElement('div');
+                    workoutDiv.className = "solid-card p-4 rounded-lg mb-3";
+                    
+                    const dateHeader = document.createElement('h4');
+                    dateHeader.className = "text-md font-semibold text-lime-300 mb-2";
+                    dateHeader.textContent = formatDateDisplay(workout.date);
+                    workoutDiv.appendChild(dateHeader);
+
+                    const setsList = document.createElement('ul');
+                    setsList.className = "space-y-1 text-gray-200";
+                    workout.sets.forEach((set, index) => {
+                        const setItem = document.createElement('li');
+                        setItem.textContent = `Set ${index + 1}: ${set.reps} reps @ ${formatWeight(set.weight)}`;
+                        setsList.appendChild(setItem);
+                    });
+                    workoutDiv.appendChild(setsList);
+                    fullExerciseHistoryList.appendChild(workoutDiv);
+                });
+            }
+
+            // Render Body Weight History
+            function renderBodyWeightHistory() {
+                bodyweightHistoryList.innerHTML = '';
+                if (db.bodyWeight.length === 0) {
+                    bodyweightHistoryList.innerHTML = `<p class="text-gray-500 text-center mt-8">No body weight logged yet.</p>`;
+                    if (bodyWeightChart) {
+                        bodyWeightChart.destroy();
+                        bodyWeightChart = null;
+                    }
+                    return;
+                }
+
+                // Sort by date ascending for chart
+                const sortedHistory = [...db.bodyWeight].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                // Render list (descending)
+                sortedHistory.slice().reverse().forEach((entry, index) => {
+                    const el = document.createElement('div');
+                    el.className = "solid-card p-4 rounded-lg flex justify-between items-center";
+                    
+                    const text = document.createElement('span');
+                    text.className = "font-medium text-gray-100";
+                    text.textContent = `${formatDateDisplay(entry.date)}: ${formatWeight(entry.weightKg, unitPreference)}`;
+                    
+                    // Simple delete button for body weight entries
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = "text-sm text-red-500 hover:text-red-400 font-medium px-2";
+                    deleteBtn.textContent = "Remove";
+                    deleteBtn.addEventListener('click', () => {
+                         showModal(
+                            "Delete Entry?",
+                            `Remove body weight entry for ${formatDateDisplay(entry.date)}?`,
+                            () => {
+                                db.bodyWeight.splice(db.bodyWeight.indexOf(entry), 1); // Remove by object reference
+                                saveData();
+                                hideModal();
+                                renderBodyWeightHistory();
+                                showMessage("Entry removed", true);
+                            }
+                        );
+                    });
+
+                    el.appendChild(text);
+                    el.appendChild(deleteBtn);
+                    bodyweightHistoryList.appendChild(el);
+                });
+
+                // Render Chart
+                renderBodyWeightChart(sortedHistory);
+            }
+
+            // Render Body Weight Chart
+            function renderBodyWeightChart(data) {
+                if (bodyWeightChart) {
+                    bodyWeightChart.destroy();
+                }
+
+                const labels = data.map(entry => formatDateDisplay(entry.date));
+                const chartData = data.map(entry => {
+                    if (unitPreference === 'lbs') {
+                        return convertWeight(entry.weightKg, 'kg', 'lbs').toFixed(1);
+                    }
+                    return entry.weightKg.toFixed(1);
+                });
+
+                const ctx = bodyweightChartCanvas.getContext('2d');
+                bodyWeightChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: `Body Weight (${unitPreference})`,
+                            data: chartData,
+                            borderColor: '#a3e635', // lime-400
+                            backgroundColor: 'rgba(163, 230, 53, 0.1)',
+                            fill: true,
+                            tension: 0.1,
+                            pointBackgroundColor: '#a3e635',
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                ticks: {
+                                    color: '#9ca3af' // gray-400
+                                },
+                                grid: {
+                                    color: '#374151' // gray-700
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#9ca3af', // gray-400
+                                    maxRotation: 0,
+                                    autoSkip: true,
+                                    maxTicksLimit: 7 // Limit ticks on mobile
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false,
+                            },
+                            tooltip: {
+                                backgroundColor: '#1f2937', // gray-800
+                                titleColor: '#a3e635', // lime-400
+                                bodyColor: '#f3f4f6', // gray-100
+                                borderColor: '#374151', // gray-700
+                                borderWidth: 1
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Render Global History (all workouts for all routines)
+            function renderGlobalHistory() {
+                globalWorkoutHistoryList.innerHTML = '';
+                let allWorkouts = [];
+
+                for (const routineName in db.routines) {
+                    for (const exerciseName in db.routines[routineName]) {
+                        db.routines[routineName][exerciseName].forEach(workout => {
+                            allWorkouts.push({
+                                routine: routineName,
+                                exercise: exerciseName,
+                                date: workout.date,
+                                sets: workout.sets
+                            });
+                        });
+                    }
+                }
+
+                if (allWorkouts.length === 0) {
+                    globalWorkoutHistoryList.innerHTML = `<p class="text-gray-500 text-center mt-8">No workouts recorded yet across all routines.</p>`;
+                    return;
+                }
+
+                // Sort all workouts by date descending
+                allWorkouts.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                // Group by date for display
+                const groupedByDate = {};
+                allWorkouts.forEach(workout => {
+                    if (!groupedByDate[workout.date]) {
+                        groupedByDate[workout.date] = [];
+                    }
+                    groupedByDate[workout.date].push(workout);
+                });
+
+                for (const dateIso in groupedByDate) {
+                    const dailyWorkouts = groupedByDate[dateIso];
+                    const dateDiv = document.createElement('div');
+                    dateDiv.className = "solid-card p-4 rounded-lg mb-4";
+
+                    const dateHeader = document.createElement('h3');
+                    dateHeader.className = "text-lg font-bold text-lime-300 mb-3 border-b border-gray-700 pb-2";
+                    dateHeader.textContent = formatDateDisplay(dateIso);
+                    dateDiv.appendChild(dateHeader);
+
+                    dailyWorkouts.forEach(workout => {
+                        const exerciseDiv = document.createElement('div');
+                        exerciseDiv.className = "mb-3 last:mb-0 p-3 bg-gray-900/50 rounded-md";
+
+                        const exerciseTitle = document.createElement('h4');
+                        exerciseTitle.className = "text-md font-semibold text-gray-100 mb-1";
+                        exerciseTitle.textContent = `${workout.routine} - ${workout.exercise}`;
+                        exerciseDiv.appendChild(exerciseTitle);
+
+                        const setsList = document.createElement('ul');
+                        setsList.className = "space-y-1 text-gray-300 text-sm";
+                        workout.sets.forEach((set, index) => {
+                            const setItem = document.createElement('li');
+                            setItem.textContent = `Set ${index + 1}: ${set.reps} reps @ ${formatWeight(set.weight)}`;
+                            setsList.appendChild(setItem);
+                        });
+                        exerciseDiv.appendChild(setsList);
+                        dateDiv.appendChild(exerciseDiv);
+                    });
+                    globalWorkoutHistoryList.appendChild(dateDiv);
+                }
+            }
+
+
+            // --- EVENT HANDLERS ---
+            // Unit Toggles
+            unitToggleKg.addEventListener('click', () => updateUnitPreference('kg'));
+            unitToggleLbs.addEventListener('click', () => updateUnitPreference('lbs'));
+
+            // Tab Navigation
+            tabButtons.routines.addEventListener('click', () => showView('routines'));
+            tabButtons.bodyweight.addEventListener('click', () => showView('bodyweight'));
+            tabButtons.history.addEventListener('click', () => showView('globalHistory'));
+
+            // Add Routine
+            addRoutineForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const routineName = toTitleCase(newRoutineInput.value.trim());
+                if (routineName) {
+                    if (db.routines[routineName]) {
+                        showMessage(`Routine "${routineName}" already exists!`, true);
+                        return;
+                    }
+                    db.routines[routineName] = {}; // Initialize with an empty object for exercises
+                    saveData();
+                    renderRoutineList();
+                    showMessage(`Routine "${routineName}" added.`);
+                    newRoutineInput.value = '';
+                }
+            });
+
+            // Delete Routine
+            deleteRoutineBtn.addEventListener('click', () => {
+                if (currentRoutine) {
+                    showModal(
+                        "Delete Routine?",
+                        `Are you sure you want to delete the routine "${currentRoutine}" and ALL its exercise history? This cannot be undone.`,
+                        () => {
+                            delete db.routines[currentRoutine];
+                            saveData();
+                            hideModal();
+                            showMessage(`Routine "${currentRoutine}" deleted.`, true);
+                            currentRoutine = null;
+                            showView('routines'); // Go back to routines list
+                        }
+                    );
+                }
+            });
+
+            // Add Exercise to Routine
+            addExerciseToRoutineForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const exerciseName = toTitleCase(newRoutineExerciseName.value.trim());
+                if (exerciseName && currentRoutine) {
+                    if (db.routines[currentRoutine][exerciseName]) {
+                        showMessage(`Exercise "${exerciseName}" already exists in this routine!`, true);
+                        return;
+                    }
+                    db.routines[currentRoutine][exerciseName] = []; // Initialize with an empty array for workouts
+                    saveData();
+                    renderRoutineExercises(currentRoutine);
+                    showMessage(`Exercise "${exerciseName}" added to "${currentRoutine}".`);
+                    newRoutineExerciseName.value = '';
+                }
+            });
+
+            // Delete Exercise from Routine
+            deleteExerciseFromRoutineBtn.addEventListener('click', () => {
+                if (currentRoutine && currentExerciseInRoutine) {
+                    showModal(
+                        "Delete Exercise?",
+                        `Are you sure you want to delete "${currentExerciseInRoutine}" from "${currentRoutine}" and ALL its history? This cannot be undone.`,
+                        () => {
+                            delete db.routines[currentRoutine][currentExerciseInRoutine];
+                            saveData();
+                            hideModal();
+                            showMessage(`Exercise "${currentExerciseInRoutine}" deleted.`, true);
+                            currentExerciseInRoutine = null;
+                            showView('routineDetail'); // Go back to routine exercises list
+                            renderRoutineExercises(currentRoutine);
+                        }
+                    );
+                }
+            });
+
+            // Add Set
+            addSetForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const reps = parseInt(repsInput.value);
+                let weight = parseFloat(weightInput.value);
+
+                if (isNaN(reps) || isNaN(weight) || reps <= 0 || weight < 0) {
+                    showMessage("Please enter valid positive reps and weight", true);
+                    return;
+                }
+
+                // Convert weight to KG for internal storage if LBS was used
+                if (unitPreference === 'lbs') {
+                    weight = convertWeight(weight, 'lbs', 'kg');
+                }
+
+                currentSets.push({ reps, weight });
+                renderCurrentSets();
+
+                repsInput.value = '';
+                weightInput.value = '';
+                repsInput.focus();
+            });
+
+            // Save Workout
+            saveWorkoutBtn.addEventListener('click', () => {
+                if (currentSets.length === 0) {
+                    showMessage("Add at least one set to save the workout", true);
+                    return;
+                }
+
+                const newWorkout = {
+                    date: getTodayDate(),
+                    sets: currentSets
+                };
+
+                // Ensure the path exists
+                if (!db.routines[currentRoutine]) db.routines[currentRoutine] = {};
+                if (!db.routines[currentRoutine][currentExerciseInRoutine]) db.routines[currentRoutine][currentExerciseInRoutine] = [];
+
+                db.routines[currentRoutine][currentExerciseInRoutine].push(newWorkout);
+                saveData();
+                
+                currentSets = []; // Clear for next session
+                renderCurrentSets(); // Update display
+                lastWorkoutInfo.textContent = formatLastWorkout(currentRoutine, currentExerciseInRoutine); // Update last workout info
+                showMessage("Workout Saved!");
+            });
+
+            // Add Body Weight
+            addBodyweightForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                let weight = parseFloat(bodyweightInput.value);
+                if (isNaN(weight) || weight <= 0) {
+                    showMessage("Please enter a valid positive body weight", true);
+                    return;
+                }
+
+                // Convert weight to KG for internal storage if LBS was used
+                let weightKg = weight;
+                if (unitPreference === 'lbs') {
+                    weightKg = convertWeight(weight, 'lbs', 'kg');
+                }
+
+                // Check for existing entry for today
+                const today = getTodayDate();
+                const existingIndex = db.bodyWeight.findIndex(entry => entry.date === today);
+
+                if (existingIndex > -1) {
+                    // Update existing entry
+                    db.bodyWeight[existingIndex].weightKg = weightKg;
+                    showMessage(`Updated body weight for today to ${formatWeight(weightKg)}!`);
+                } else {
+                    // Add new entry
+                    db.bodyWeight.push({ date: today, weightKg: weightKg });
+                    showMessage(`Logged body weight: ${formatWeight(weightKg)}!`);
+                }
+                
+                saveData();
+                renderBodyWeightHistory();
+                bodyweightInput.value = '';
+            });
+
+            // Navigation Buttons
+            routineDetailBackBtn.addEventListener('click', () => showView('routines'));
+            exerciseLoggingBackBtn.addEventListener('click', () => showView('routineDetail'));
+            exerciseHistoryBackBtn.addEventListener('click', () => showView('exerciseLogging'));
+
+            // Show Exercise History
+            showExerciseHistoryBtn.addEventListener('click', () => {
+                if (currentRoutine && currentExerciseInRoutine) {
+                    historyExerciseName.textContent = currentExerciseInRoutine + " History";
+                    showView('exerciseHistory');
+                    renderExerciseHistory(currentRoutine, currentExerciseInRoutine);
+                }
+            });
+
+            // Clear All Data
+            clearAllBtn.addEventListener('click', () => {
+                showModal(
+                    "Clear All Data?",
+                    "Are you sure you want to delete ALL workout routines, exercises, and body weight data? This cannot be undone and will reset the app.",
+                    () => {
+                        db = { routines: {}, bodyWeight: [] }; // Reset the database
+                        saveData();
+                        hideModal();
+                        currentRoutine = null;
+                        currentExerciseInRoutine = null;
+                        currentSets = [];
+                        showView('routines'); // Go back to the main routine list
+                        showMessage("All app data cleared!", true);
+                    }
+                );
+            });
+
+            // Modal Listeners
+            modalCancelBtn.addEventListener('click', hideModal);
+            modalConfirmBtn.addEventListener('click', () => {
+                if (modalConfirmCallback) {
+                    modalConfirmCallback();
+                }
+            });
+
+
+            // --- INITIALIZATION ---
+            function init() {
+                loadData();
+                updateUnitPreference(unitPreference); // Set initial unit toggle state
+                showView('routines'); // Start on the routines view
+                newRoutineInput.value = ''; // Clear inputs
+                newRoutineExerciseName.value = '';
+                repsInput.value = '';
+                weightInput.value = '';
+                bodyweightInput.value = '';
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
